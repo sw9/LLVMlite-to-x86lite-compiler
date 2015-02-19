@@ -167,12 +167,12 @@ let compile_insn ctxt (uid, i) : X86.ins list =
 let compile_terminator ctxt t =
 	begin match t with
 	| Ret (ty, o) ->
-		let ins = [(Movq, [Ind3(Lit(Int64.neg 8L), Rbp)])] @
-							[(Movq, [Ind3(Lit(Int64.neg 16L), R12)])] @
-							[(Movq, [Ind3(Lit(Int64.neg 24L), R13)])] @
-							[(Movq, [Ind3(Lit(Int64.neg 32L), R14)])] @
-							[(Movq, [Ind3(Lit(Int64.neg 40L), R15)])] @
-							[(Movq, [X86.Reg Rsp; Ind3 (Lit 8L, Rbp)])] @
+		let ins = [(Movq, [(Ind3(Lit(Int64.neg 8L), Rbp)); (Reg Rbx)])] @
+							[(Movq, [(Ind3(Lit(Int64.neg 16L), Rbp)); (Reg R12)])] @
+							[(Movq, [(Ind3(Lit(Int64.neg 24L), Rbp)); (Reg R13)])] @
+              [(Movq, [(Ind3(Lit(Int64.neg 32L), Rbp)); (Reg R14)])] @
+              [(Movq, [(Ind3(Lit(Int64.neg 40L), Rbp)); (Reg R15)])] @
+   						[(Movq, [X86.Reg Rsp; Ind3 (Lit 8L, Rbp)])] @
 							[(Movq, [X86.Reg Rbp; Ind2 (Rbp)])] in 
 		begin match o with
 		| None -> ins
@@ -239,7 +239,8 @@ let compile_fdecl tdecls name { fty; param; cfg } =
   (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
     (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15])::
   [] in
-  let insl = isnl2 @ args in
+  let insl = isnl2 @ args @ (compile_terminator {tdecls=tdecls; layout = []} 
+  (Ret (Void, None))) in
   
 	[{ lbl = name; global = false; asm = X86.Text insl }]
 
@@ -263,4 +264,6 @@ and compile_gdecl (_, g) = compile_ginit g
 let compile_prog { tdecls; gdecls; fdecls } : X86.prog =
 	let g = fun (lbl, gdecl) -> Asm.data (Platform.mangle lbl) (compile_gdecl gdecl) in
 	let f = fun (name, fdecl) -> compile_fdecl tdecls name fdecl in
-	(List.map g gdecls) @ (List.map f fdecls |> List.flatten)
+	let prog = (List.map g gdecls) @ (List.map f fdecls |> List.flatten) in
+  print_endline (X86.string_of_prog prog);
+  prog
