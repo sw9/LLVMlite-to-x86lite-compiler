@@ -16,8 +16,8 @@ let compile_cnd = function
 	| Ll.Sgt -> X86.Gt
 	| Ll.Sge -> X86.Ge
 
-(* locals and layout                                                   *)
-(* --------------------------------------------------------            *)
+(* locals and layout                                                       *)
+(* --------------------------------------------------------                *)
 
 (* One key problem in compiling the LLVM IR is how to map its local        *)
 (* identifiers to X86 abstractions. For the best performance, one would    *)
@@ -75,8 +75,8 @@ let compile_operand ctxt dest : Ll.operand -> ins =
 	| Gid g -> (Movq, [dest; Imm (Lbl (Platform.mangle g)) ])
 	end
 
-(* compiling call                                                      *)
-(* ----------------------------------------------------------          *)
+(* compiling call                                                          *)
+(* ----------------------------------------------------------              *)
 
 (* You will probably find it helpful to implement a helper function that   *)
 (* generates code for the LLVM IR call instruction. The code you generate  *)
@@ -90,8 +90,8 @@ let compile_operand ctxt dest : Ll.operand -> ins =
 (* NOTE: Don't forget to preserve caller-save registers (only if needed).  *)
 (* ]                                                                       *)
 
-(* compiling getelementptr (gep)                                       *)
-(* -------------------------------------------                         *)
+(* compiling getelementptr (gep)                                           *)
+(* -------------------------------------------                             *)
 
 (* The getelementptr instruction computes an address by indexing into a    *)
 (* datastructure, following a path of offsets. It computes the address     *)
@@ -139,8 +139,8 @@ let rec size_ty tdecls t : int =
 let compile_gep ctxt (op : Ll.ty * Ll.operand) (path: Ll.operand list) : ins list =
 	failwith "compile_gep not implemented"
 
-(* compiling instructions                                          *)
-(* --------------------------------------------------              *)
+(* compiling instructions                                                  *)
+(* --------------------------------------------------                      *)
 
 (* The result of compiling a single LLVM instruction might be many x86     *)
 (* instructions. We have not determined the structure of this code for     *)
@@ -157,8 +157,8 @@ let compile_gep ctxt (op : Ll.ty * Ll.operand) (path: Ll.operand list) : ins lis
 let compile_insn ctxt (uid, i) : X86.ins list =
 	failwith "compile_insn not implemented"
 
-(* compiling terminators                                           *)
-(* ---------------------------------------------------             *)
+(* compiling terminators                                                   *)
+(* ---------------------------------------------------                     *)
 
 (* Compile block terminators is not too difficult: - Ret should properly   *)
 (* exit the function: freeing stack space, restoring the value of %rbp,    *)
@@ -168,8 +168,8 @@ let compile_terminator ctxt t =
 	begin match t with
 	| Ret (t, o) -> 
 
-(* compiling blocks                                                *)
-(* ---------------------------------------------------------       *)
+(* compiling blocks                                                        *)
+(* ---------------------------------------------------------               *)
 
 (* We have left this helper function here for you to complete. *)
 let compile_block ctxt blk : ins list =
@@ -178,8 +178,8 @@ let compile_block ctxt blk : ins list =
 let compile_lbl_block lbl ctxt blk : elem =
 	Asm.text lbl (compile_block ctxt blk)
 
-(* compile_fdecl                                                   *)
-(* ------------------------------------------------------------    *)
+(* compile_fdecl                                                           *)
+(* ------------------------------------------------------------            *)
 
 (* This helper function computes the location of the nth incoming function *)
 (* argument: either in a register or relative to %rbp, according to the    *)
@@ -194,7 +194,7 @@ let arg_loc (n : int) : operand =
 	| 3 -> X86.Reg Rcx
 	| 4 -> X86.Reg R08
 	| 5 -> X86.Reg R09
-	| _ -> (X86.Ind3 (Lit (Int64.of_int ((n-4)*8)), Rbp))
+	| _ -> (X86.Ind3 (Lit (Int64.of_int ((n -4) *8)), Rbp))
 	end
 
 (* The code for the entry-point of a function must do several things: -    *)
@@ -213,17 +213,20 @@ let compile_fdecl tdecls name { fty; param; cfg } =
   let f = fun (i: int) (x: ty) -> 
     let op = arg_loc i in
     (Pushq, [op])
-  in    
+  in 
   let (x, y) = fty in
   
   let args = (List.mapi f x) in
-  let isnl2 = (Pushq, [X86.Reg Rbp])::(Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::[] in
+  let isnl2 = (Pushq, [X86.Reg Rbp]):: (Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::
+  (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
+    (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15])::
+  [] in
   let insl = isnl2 @ args in
   
-	[{lbl=name; global=false; asm=X86.Text insl}]
+	[{ lbl = name; global = false; asm = X86.Text insl }]
 
-(* compile_gdecl                                                   *)
-(* ------------------------------------------------------------    *)
+(* compile_gdecl                                                           *)
+(* ------------------------------------------------------------            *)
 
 (* Compile a global value into an X86 global data declaration and map a    *)
 (* global uid to its associated X86 label.                                 *)
@@ -236,8 +239,8 @@ let rec compile_ginit = function
 
 and compile_gdecl (_, g) = compile_ginit g
 
-(* compile_prog                                                        *)
-(* -------------------------------------------------------------       *)
+(* compile_prog                                                            *)
+(* -------------------------------------------------------------           *)
 
 let compile_prog { tdecls; gdecls; fdecls } : X86.prog =
 	let g = fun (lbl, gdecl) -> Asm.data (Platform.mangle lbl) (compile_gdecl gdecl) in
