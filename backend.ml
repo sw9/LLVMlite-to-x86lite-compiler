@@ -167,10 +167,20 @@ let compile_insn ctxt (uid, i) : X86.ins list =
 let compile_terminator ctxt t =
 	begin match t with
 	| Ret (ty, o) ->
-		let ins = [(Movq, [])]@[] in 
+		let ins = [(Movq, [Ind3(Lit(Int64.neg 8L), Rbp)])] @
+							[(Movq, [Ind3(Lit(Int64.neg 16L), R12)])] @
+							[(Movq, [Ind3(Lit(Int64.neg 24L), R13)])] @
+							[(Movq, [Ind3(Lit(Int64.neg 32L), R14)])] @
+							[(Movq, [Ind3(Lit(Int64.neg 40L), R15)])] @
+							[(Movq, [X86.Reg Rsp; Ind3 (Lit 8L, Rbp)])] @
+							[(Movq, [X86.Reg Rbp; Ind2 (Rbp)])] in 
 		begin match o with
 		| None -> ins
-		| Some op -> ins @ [(compile_operand ctxt (X86.Reg Rax) op)]
+		| Some op -> 
+			begin match ty with
+			| Void -> ins 
+			| _ -> ins @ [(compile_operand ctxt (X86.Reg Rax) op)]
+			end
 		end
 	| _ -> []
 	end
