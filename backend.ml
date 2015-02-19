@@ -202,7 +202,10 @@ let arg_loc (n : int) : operand =
 (* the stack storage needed to hold all of the local stack slots.          *)
 
 let compile_fdecl tdecls name { fty; param; cfg } =
-	[{lbl=name; global=false; asm=X86.Text[(Pushq,[X86.Reg Rbp])]}]
+  let isnl = (Pushq,[X86.Reg Rbp]) ::  [] in
+  
+  
+	[{lbl=name; global=false; asm=X86.Text isnl}]
 
 (* compile_gdecl                                                   *)
 (* ------------------------------------------------------------    *)
