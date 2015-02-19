@@ -166,7 +166,15 @@ let compile_insn ctxt (uid, i) : X86.ins list =
 (* branch should treat its operand as a boolean conditional                *)
 let compile_terminator ctxt t =
 	begin match t with
-	| Ret (t, o) -> 
+	| Ret (ty, o) ->
+		let ins = [(Movq, [])]@[] in 
+		begin match o with
+		| None -> ins
+		| Some op -> ins @ [(compile_operand ctxt (X86.Reg Rax) op)]
+		end
+	| _ -> []
+	end
+		
 
 (* compiling blocks                                                *)
 (* ---------------------------------------------------------       *)
