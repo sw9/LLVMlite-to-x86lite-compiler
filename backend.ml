@@ -166,7 +166,8 @@ let compile_insn ctxt (uid, i) : X86.ins list =
 (* and putting the return value (if any) in %rax. - Br should jump - Cbr   *)
 (* branch should treat its operand as a boolean conditional                *)
 let compile_terminator ctxt t =
-	failwith "compile_terminator not implemented"
+	begin match t with
+	| Ret (t, o) -> 
 
 (* compiling blocks                                                *)
 (* ---------------------------------------------------------       *)
