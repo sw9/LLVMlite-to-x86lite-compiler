@@ -74,7 +74,6 @@ let compile_operand ctxt dest : Ll.operand -> ins =
 	| Id i -> (Movq, [dest; List.assoc i ctxt.layout])
 	| Gid g -> (Movq, [dest; Imm (Lbl (Platform.mangle g)) ])
 	end
-		
 
 (* compiling call                                                      *)
 (* ----------------------------------------------------------          *)
@@ -210,7 +209,18 @@ let arg_loc (n : int) : operand =
 (* the stack storage needed to hold all of the local stack slots.          *)
 
 let compile_fdecl tdecls name { fty; param; cfg } =
-	[{lbl=name; global=false; asm=X86.Text[(Pushq,[X86.Reg Rbp])]}]
+  
+  let f = fun (i: int) (x: ty) -> 
+    let op = arg_loc i in
+    (Pushq, [op])
+  in    
+  let (x, y) = fty in
+  
+  let args = (List.mapi f x) in
+  let isnl2 = (Pushq, [X86.Reg Rbp])::(Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::[] in
+  let insl = isnl2 @ args in
+  
+	[{lbl=name; global=false; asm=X86.Text insl}]
 
 (* compile_gdecl                                                   *)
 (* ------------------------------------------------------------    *)
