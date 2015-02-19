@@ -68,7 +68,13 @@ let lookup m x = List.assoc x m
 (* LLVM operand into a designated destination (usually a register).        *)
 
 let compile_operand ctxt dest : Ll.operand -> ins =
-	failwith "lol"
+	fun (x: Ll.operand) -> begin match x with
+	| Null -> (Movq, [dest; Imm (Lit 0L) ])
+	| Const n -> (Movq, [dest; Imm (Lit n) ])
+	| Id i -> (Movq, [dest; List.assoc i ctxt.layout])
+	| Gid g -> (Movq, [dest; Imm (Lbl (Platform.mangle g)) ])
+	end
+		
 
 (* compiling call                                                      *)
 (* ----------------------------------------------------------          *)
@@ -100,6 +106,7 @@ let compile_operand ctxt dest : Ll.operand -> ins =
 (* pointers, I1, and I64 are 8 bytes - the size of a named type is the     *)
 (* size of its definition - Void, i8, and functions have undefined sizes   *)
 (* according to LLVMlite your function should simply return 0              *)
+
 let rec size_ty tdecls t : int =
 	let add td size e: int =
 		size + (size_ty td e)
