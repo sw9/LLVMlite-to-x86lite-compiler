@@ -68,9 +68,9 @@ let lookup m x = List.assoc x m
 (* LLVM operand into a designated destination (usually a register).        *)
 
 let calc_loc (i,lt) uid =
-    (i+1, lt @ [(uid, (X86.Ind3 (Lit (Int64.of_int (i * -8)), Rax)))]) 
+    (i+1, lt @ [(uid, (X86.Ind3 (Lit (Int64.of_int (i * -8)), R11)))]) 
 
-let generate_layout (i,lt) uid_lst= 
+let generate_layout (i,lt) uid_lst = 
     (List.fold_left calc_loc (i,lt) uid_lst)
 
 let compile_operand ctxt dest : Ll.operand -> ins =
@@ -195,7 +195,7 @@ let compile_terminator ctxt t =
 	| Some op ->
 	  begin match ty with
 	    | Void -> ins  (* void*)
-	    | _ -> (compile_operand_list ctxt (X86.Reg Rax) op) @ ins
+	    | _ -> (compile_operand_list ctxt (X86.Reg R11) op) @ ins
 	  end
       end
      | Br lbl -> [(Jmp, [(Imm (Lbl (Platform.mangle lbl)))])]
@@ -215,7 +215,7 @@ let compile_terminator ctxt t =
 
 (* We have left this helper function here for you to complete. *)
 let compile_block ctxt blk : ins list =
-  failwith "compile_block not implemented"
+  
 
 let compile_lbl_block lbl ctxt blk : elem =
   Asm.text lbl (compile_block ctxt blk)
@@ -251,6 +251,11 @@ let arg_loc (n : int) : operand =
 (* the stack storage needed to hold all of the local stack slots.          *)
 
 let compile_fdecl tdecls name { fty; param; cfg } =
+  (*initial block*)
+  let blk1 =
+    begin match cfg with
+      | (x, y) -> x
+    end in
 
   let f = fun (i: int) (x: ty) ->
     let op = arg_loc i in
@@ -261,12 +266,21 @@ let compile_fdecl tdecls name { fty; param; cfg } =
   let args = (List.mapi f x) in
   let isnl2 = (Pushq, [X86.Reg Rbp]):: (Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::
 	      (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
-	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15])::
+	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15]):: (Pushq, [X86.Reg R15])::
+              (Pushq, [X86.Reg R15]):: (Movq, [(X86.Reg Rsp); (X86.Reg R11)]) ::
+              (Addq, [(X86.Imm (Lit (Int64.of_int (8 * (List.length param - 1))))); (X86.Reg Rsp)]) ::
 	      [] in
-  let insl = isnl2 @ args @ (compile_terminator { tdecls = tdecls; layout = [("string", X86.Imm (Lit 21L))];
-			                        }  (Ret (I64, Some (Id "string")))) in
 
-  [{ lbl = Platform.mangle name; global = true; asm = X86.Text insl }]
+  let lyt = begin match (generate_layout (0, []) param) with
+    | (x, y) -> y
+  end in
+
+  let insl = isnl2 @ args 
+             
+             @ (compile_terminator {tdecls = tdecls; layout = lyt} blk1.terminator) in
+  let elem = [{ lbl = Platform.mangle name; global = true; asm = X86.Text insl }] in
+
+  
 
 (* compile_gdecl                                                           *)
 (* ------------------------------------------------------------            *)
