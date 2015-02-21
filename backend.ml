@@ -168,10 +168,63 @@ let compile_gep ctxt (op : Ll.ty * Ll.operand) (path: Ll.operand list) : ins lis
 (* Null operands aren't valid pointers. Don't forget to Platform.mangle    *)
 (* the global identifier. - Alloca: needs to return a pointer into the     *)
 (* stack - Bitcast: does nothing interesting at the assembly level         *)
-let compile_insn ctxt (uid, i) : X86.ins list =
-  failwith "compile_insn not implemented"
 
-(* compiling terminators                                                   *)
+let compile_insn ctxt (uid, i) : X86.ins list =
+   begin match i with
+   | Binop(b, t, op1, op2) -> 
+          begin match b with
+          | Add -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Addq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          | Sub -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Subq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          | Mul -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Imulq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          | Shl -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Shlq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          | Lshr -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Shrq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          | Ashr -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Sarq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          | And -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Andq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          | Or -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Orq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+
+          | Xor -> 
+                  (compile_operand_list ctxt (Reg R12) op1) @
+                  (compile_operand_list ctxt (Reg R13) op2) @
+                  [(Xorq, [Reg R12; Reg R13])] @ 
+                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          end
+    | _ -> []
+          end
+
+
+    (* compiling terminators                                                   *)
 (* ---------------------------------------------------                     *)
 
 (* Compile block terminators is not too difficult: - Ret should properly   *)
