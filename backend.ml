@@ -78,8 +78,15 @@ let compile_operand ctxt dest : Ll.operand -> ins =
       | Null -> (Movq, [Imm (Lit 0L); dest ])
       | Const n -> (Movq, [Imm (Lit n); dest ])
       | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
-      | Gid g -> (Movq, [Imm (Lbl (Platform.mangle g)); dest ])
+      | Gid g -> (Movq, [(Reg R10); dest ])
     end
+
+let compile_operand_list ctxt dest ll_op: ins list =
+  begin match ll_op with
+    | Gid g -> (Leaq, [(Imm (Lbl (Platform.mangle g))); 
+                       (Reg R10)])::(compile_operand ctxt dest ll_op)::[]
+    | _ -> (compile_operand ctxt dest ll_op)::[]
+  end
 
 (* compiling call                                                          *)
 (* ----------------------------------------------------------              *)
@@ -188,10 +195,19 @@ let compile_terminator ctxt t =
 	| Some op ->
 	  begin match ty with
 	    | Void -> ins  (* void*)
-	    | _ ->  [(compile_operand ctxt (X86.Reg Rax) op)] @ ins
+	    | _ -> (compile_operand_list ctxt (X86.Reg Rax) op) @ ins
 	  end
       end
-     | _ -> failwith "not implemented"
+     | Br lbl -> [(Jmp, [(Imm (Lbl (Platform.mangle lbl)))])]
+     | Cbr (op, l1, l2) -> 
+       begin match op with
+         | Const _ | Gid _ | Id _
+           -> (compile_operand_list ctxt (X86.Reg R10) op) @ 
+               [(Cmpq, [(Reg R10); (Imm (Lit (1L)))])] @
+               [(J Eq, [(Imm (Lbl (Platform.mangle l1)))])] @
+               [(Jmp, [(Imm (Lbl (Platform.mangle l2)))])]
+         | _ -> failwith "not a valid condition"
+      end
   end
 
 (* compiling blocks                                                        *)
