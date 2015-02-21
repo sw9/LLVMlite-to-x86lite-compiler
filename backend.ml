@@ -69,10 +69,10 @@ let lookup m x = List.assoc x m
 
 let compile_operand ctxt dest : Ll.operand -> ins =
   fun (x: Ll.operand) -> begin match x with
-      | Null -> (Movq, [dest; Imm (Lit 0L) ])
-      | Const n -> (Movq, [dest; Imm (Lit n) ])
-      | Id i -> (Movq, [dest; List.assoc i ctxt.layout])
-      | Gid g -> (Movq, [dest; Imm (Lbl (Platform.mangle g)) ])
+      | Null -> (Movq, [Imm (Lit 0L); dest ])
+      | Const n -> (Movq, [Imm (Lit n); dest ])
+      | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
+      | Gid g -> (Movq, [Imm (Lbl (Platform.mangle g)); dest ])
     end
 
 (* compiling call                                                          *)
@@ -165,6 +165,7 @@ let compile_insn ctxt (uid, i) : X86.ins list =
 (* and putting the return value (if any) in %rax. - Br should jump - Cbr   *)
 (* branch should treat its operand as a boolean conditional                *)
 let compile_terminator ctxt t =
+  print_endline (string_of_terminator t);
   begin match t with
     | Ret (ty, o) ->
       let ins = [(Movq, [(Ind3(Lit(Int64.neg 8L), Rbp)); (Reg Rbx)])] @
@@ -172,17 +173,18 @@ let compile_terminator ctxt t =
 		[(Movq, [(Ind3(Lit(Int64.neg 24L), Rbp)); (Reg R13)])] @
 		[(Movq, [(Ind3(Lit(Int64.neg 32L), Rbp)); (Reg R14)])] @
 		[(Movq, [(Ind3(Lit(Int64.neg 40L), Rbp)); (Reg R15)])] @
-		[(Movq, [X86.Reg Rsp; Ind3 (Lit 8L, Rbp)])] @
-		[(Movq, [X86.Reg Rbp; Ind2 (Rbp)])] in
+                [(Movq, [(X86.Reg Rbp); (X86.Reg Rsp)])] @
+		[(Addq, [(Imm (Lit (8L))); (X86.Reg Rsp)])] @
+		[(Movq, [(Ind2 (Rbp)); (X86.Reg Rbp)])] @ [Retq, []] in
       begin match o with
-	| None -> ins
+	| None -> ins (*void*)
 	| Some op ->
 	  begin match ty with
-	    | Void -> ins
-	    | _ -> ins @ [(compile_operand ctxt (X86.Reg Rax) op)]
+	    | Void -> ins  (* void*)
+	    | _ ->  [(compile_operand ctxt (X86.Reg Rax) op)] @ ins
 	  end
       end
-    | _ -> []
+     | _ -> failwith "not implemented"
   end
 
 (* compiling blocks                                                        *)
@@ -238,8 +240,8 @@ let compile_fdecl tdecls name { fty; param; cfg } =
 	      (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
 	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15])::
 	      [] in
-  let insl = isnl2 @ args @ (compile_terminator { tdecls = tdecls; layout = []}
-			       (Ret (Void, None))) in
+  let insl = isnl2 @ args @ (compile_terminator { tdecls = tdecls; layout = [("string", X86.Imm (Lit 21L))];
+			                        }  (Ret (I64, Some (Id "string")))) in
 
   [{ lbl = Platform.mangle name; global = true; asm = X86.Text insl }]
 
