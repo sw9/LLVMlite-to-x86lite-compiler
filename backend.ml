@@ -67,6 +67,12 @@ let lookup m x = List.assoc x m
 (* function, whose job is to generate the X86 instruction that moves an    *)
 (* LLVM operand into a designated destination (usually a register).        *)
 
+let calc_loc (i,lt) uid =
+    (i+1, lt @ [(uid, (X86.Ind3 (Lit (Int64.of_int (i * -8)), Rax)))]) 
+
+let generate_layout (i,lt) uid_lst= 
+    (List.fold_left calc_loc (i,lt) uid_lst)
+
 let compile_operand ctxt dest : Ll.operand -> ins =
   fun (x: Ll.operand) -> begin match x with
       | Null -> (Movq, [dest; Imm (Lit 0L) ])
@@ -89,6 +95,7 @@ let compile_operand ctxt dest : Ll.operand -> ins =
 (* stack, so you must free the stack space after the call returns. ] [     *)
 (* NOTE: Don't forget to preserve caller-save registers (only if needed).  *)
 (* ]                                                                       *)
+
 
 (* compiling getelementptr (gep)                                           *)
 (* -------------------------------------------                             *)
