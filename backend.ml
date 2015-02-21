@@ -9,12 +9,12 @@ open X86
 
 (* Map LL comparison operations to X86 condition codes *)
 let compile_cnd = function
-	| Ll.Eq -> X86.Eq
-	| Ll.Ne -> X86.Neq
-	| Ll.Slt -> X86.Lt
-	| Ll.Sle -> X86.Le
-	| Ll.Sgt -> X86.Gt
-	| Ll.Sge -> X86.Ge
+  | Ll.Eq -> X86.Eq
+  | Ll.Ne -> X86.Neq
+  | Ll.Slt -> X86.Lt
+  | Ll.Sle -> X86.Le
+  | Ll.Sgt -> X86.Gt
+  | Ll.Sge -> X86.Ge
 
 (* locals and layout                                                       *)
 (* --------------------------------------------------------                *)
@@ -41,8 +41,8 @@ type layout = (uid * X86.operand) list
 (* A context contains the global type declarations (needed for             *)
 (* getelementptr calculations) and a stack layout.                         *)
 type ctxt = { tdecls : (tid * ty) list
-	; layout : layout
-}
+	    ; layout : layout
+            }
 
 (* useful for looking up items in tdecls or layouts *)
 let lookup m x = List.assoc x m
@@ -68,12 +68,12 @@ let lookup m x = List.assoc x m
 (* LLVM operand into a designated destination (usually a register).        *)
 
 let compile_operand ctxt dest : Ll.operand -> ins =
-	fun (x: Ll.operand) -> begin match x with
-	| Null -> (Movq, [dest; Imm (Lit 0L) ])
-	| Const n -> (Movq, [dest; Imm (Lit n) ])
-	| Id i -> (Movq, [dest; List.assoc i ctxt.layout])
-	| Gid g -> (Movq, [dest; Imm (Lbl (Platform.mangle g)) ])
-	end
+  fun (x: Ll.operand) -> begin match x with
+      | Null -> (Movq, [dest; Imm (Lit 0L) ])
+      | Const n -> (Movq, [dest; Imm (Lit n) ])
+      | Id i -> (Movq, [dest; List.assoc i ctxt.layout])
+      | Gid g -> (Movq, [dest; Imm (Lbl (Platform.mangle g)) ])
+    end
 
 (* compiling call                                                          *)
 (* ----------------------------------------------------------              *)
@@ -107,21 +107,21 @@ let compile_operand ctxt dest : Ll.operand -> ins =
 (* according to LLVMlite your function should simply return 0              *)
 
 let rec size_ty tdecls t : int =
-	let add td size e: int =
-		size + (size_ty td e)
-	in
-	
-	let add_all = (add tdecls) in
-	
-	begin match t with
-		| Void -> 0
-		| I1 | Ptr _ | I64 -> 8
-		| I8 -> 0
-		| Struct lst -> List.fold_left add_all 0 lst
-		| Array (s, t) -> s * (size_ty tdecls t)
-		| Fun _ -> 0
-		| Namedt n -> size_ty tdecls (List.assoc n tdecls)
-	end
+  let add td size e: int =
+    size + (size_ty td e)
+  in
+
+  let add_all = (add tdecls) in
+
+  begin match t with
+    | Void -> 0
+    | I1 | Ptr _ | I64 -> 8
+    | I8 -> 0
+    | Struct lst -> List.fold_left add_all 0 lst
+    | Array (s, t) -> s * (size_ty tdecls t)
+    | Fun _ -> 0
+    | Namedt n -> size_ty tdecls (List.assoc n tdecls)
+  end
 
 (* Generates code that computes a pointer value. 1. op must be of pointer  *)
 (* type: t* 2. the value of op is the base address of the calculation 3.   *)
@@ -137,7 +137,7 @@ let rec size_ty tdecls t : int =
 (* but relative to the type f the sub-element picked out by the path so    *)
 (* far                                                                     *)
 let compile_gep ctxt (op : Ll.ty * Ll.operand) (path: Ll.operand list) : ins list =
-	failwith "compile_gep not implemented"
+  failwith "compile_gep not implemented"
 
 (* compiling instructions                                                  *)
 (* --------------------------------------------------                      *)
@@ -155,7 +155,7 @@ let compile_gep ctxt (op : Ll.ty * Ll.operand) (path: Ll.operand list) : ins lis
 (* the global identifier. - Alloca: needs to return a pointer into the     *)
 (* stack - Bitcast: does nothing interesting at the assembly level         *)
 let compile_insn ctxt (uid, i) : X86.ins list =
-	failwith "compile_insn not implemented"
+  failwith "compile_insn not implemented"
 
 (* compiling terminators                                                   *)
 (* ---------------------------------------------------                     *)
@@ -165,36 +165,35 @@ let compile_insn ctxt (uid, i) : X86.ins list =
 (* and putting the return value (if any) in %rax. - Br should jump - Cbr   *)
 (* branch should treat its operand as a boolean conditional                *)
 let compile_terminator ctxt t =
-	begin match t with
-	| Ret (ty, o) ->
-		let ins = [(Movq, [(Ind3(Lit(Int64.neg 8L), Rbp)); (Reg Rbx)])] @
-							[(Movq, [(Ind3(Lit(Int64.neg 16L), Rbp)); (Reg R12)])] @
-							[(Movq, [(Ind3(Lit(Int64.neg 24L), Rbp)); (Reg R13)])] @
-              [(Movq, [(Ind3(Lit(Int64.neg 32L), Rbp)); (Reg R14)])] @
-              [(Movq, [(Ind3(Lit(Int64.neg 40L), Rbp)); (Reg R15)])] @
-   						[(Movq, [X86.Reg Rsp; Ind3 (Lit 8L, Rbp)])] @
-							[(Movq, [X86.Reg Rbp; Ind2 (Rbp)])] in 
-		begin match o with
-		| None -> ins
-		| Some op -> 
-			begin match ty with
-			| Void -> ins 
-			| _ -> ins @ [(compile_operand ctxt (X86.Reg Rax) op)]
-			end
-		end
-	| _ -> []
-	end
-		
+  begin match t with
+    | Ret (ty, o) ->
+      let ins = [(Movq, [(Ind3(Lit(Int64.neg 8L), Rbp)); (Reg Rbx)])] @
+		[(Movq, [(Ind3(Lit(Int64.neg 16L), Rbp)); (Reg R12)])] @
+		[(Movq, [(Ind3(Lit(Int64.neg 24L), Rbp)); (Reg R13)])] @
+		[(Movq, [(Ind3(Lit(Int64.neg 32L), Rbp)); (Reg R14)])] @
+		[(Movq, [(Ind3(Lit(Int64.neg 40L), Rbp)); (Reg R15)])] @
+		[(Movq, [X86.Reg Rsp; Ind3 (Lit 8L, Rbp)])] @
+		[(Movq, [X86.Reg Rbp; Ind2 (Rbp)])] in
+      begin match o with
+	| None -> ins
+	| Some op ->
+	  begin match ty with
+	    | Void -> ins
+	    | _ -> ins @ [(compile_operand ctxt (X86.Reg Rax) op)]
+	  end
+      end
+    | _ -> []
+  end
 
 (* compiling blocks                                                        *)
 (* ---------------------------------------------------------               *)
 
 (* We have left this helper function here for you to complete. *)
 let compile_block ctxt blk : ins list =
-	failwith "compile_block not implemented"
+  failwith "compile_block not implemented"
 
 let compile_lbl_block lbl ctxt blk : elem =
-	Asm.text lbl (compile_block ctxt blk)
+  Asm.text lbl (compile_block ctxt blk)
 
 (* compile_fdecl                                                           *)
 (* ------------------------------------------------------------            *)
@@ -205,15 +204,15 @@ let compile_lbl_block lbl ctxt blk : elem =
 (* NOTE: the first six arguments are numbered 0 .. 5 ]                     *)
 
 let arg_loc (n : int) : operand =
-	begin match n with
-	| 0 -> X86.Reg Rdi
-	| 1 -> X86.Reg Rsi
-	| 2 -> X86.Reg Rdx
-	| 3 -> X86.Reg Rcx
-	| 4 -> X86.Reg R08
-	| 5 -> X86.Reg R09
-	| _ -> (X86.Ind3 (Lit (Int64.of_int ((n -4) *8)), Rbp))
-	end
+  begin match n with
+    | 0 -> X86.Reg Rdi
+    | 1 -> X86.Reg Rsi
+    | 2 -> X86.Reg Rdx
+    | 3 -> X86.Reg Rcx
+    | 4 -> X86.Reg R08
+    | 5 -> X86.Reg R09
+    | _ -> (X86.Ind3 (Lit (Int64.of_int ((n -4) *8)), Rbp))
+  end
 
 (* The code for the entry-point of a function must do several things: -    *)
 (* since our simple compiler maps local %uids to stack slots, compiling    *)
@@ -227,22 +226,22 @@ let arg_loc (n : int) : operand =
 (* the stack storage needed to hold all of the local stack slots.          *)
 
 let compile_fdecl tdecls name { fty; param; cfg } =
-  
-  let f = fun (i: int) (x: ty) -> 
+
+  let f = fun (i: int) (x: ty) ->
     let op = arg_loc i in
     (Pushq, [op])
-  in 
+  in
   let (x, y) = fty in
-  
+
   let args = (List.mapi f x) in
   let isnl2 = (Pushq, [X86.Reg Rbp]):: (Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::
-  (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
-    (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15])::
-  [] in
-  let insl = isnl2 @ args @ (compile_terminator {tdecls=tdecls; layout = []} 
-  (Ret (Void, None))) in
-  
-	[{ lbl = name; global = false; asm = X86.Text insl }]
+	      (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
+	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15])::
+	      [] in
+  let insl = isnl2 @ args @ (compile_terminator { tdecls = tdecls; layout = []}
+			       (Ret (Void, None))) in
+
+  [{ lbl = Platform.mangle name; global = true; asm = X86.Text insl }]
 
 (* compile_gdecl                                                           *)
 (* ------------------------------------------------------------            *)
@@ -250,11 +249,11 @@ let compile_fdecl tdecls name { fty; param; cfg } =
 (* Compile a global value into an X86 global data declaration and map a    *)
 (* global uid to its associated X86 label.                                 *)
 let rec compile_ginit = function
-	| GNull -> [Quad (Lit 0L)]
-	| GGid gid -> [Quad (Lbl (Platform.mangle gid))]
-	| GInt c -> [Quad (Lit c)]
-	| GString s -> [Asciz s]
-	| GArray gs | GStruct gs -> List.map compile_gdecl gs |> List.flatten
+  | GNull -> [Quad (Lit 0L)]
+  | GGid gid -> [Quad (Lbl (Platform.mangle gid))]
+  | GInt c -> [Quad (Lit c)]
+  | GString s -> [Asciz s]
+  | GArray gs | GStruct gs -> List.map compile_gdecl gs |> List.flatten
 
 and compile_gdecl (_, g) = compile_ginit g
 
@@ -262,8 +261,8 @@ and compile_gdecl (_, g) = compile_ginit g
 (* -------------------------------------------------------------           *)
 
 let compile_prog { tdecls; gdecls; fdecls } : X86.prog =
-	let g = fun (lbl, gdecl) -> Asm.data (Platform.mangle lbl) (compile_gdecl gdecl) in
-	let f = fun (name, fdecl) -> compile_fdecl tdecls name fdecl in
-	let prog = (List.map g gdecls) @ (List.map f fdecls |> List.flatten) in
+  let g = fun (lbl, gdecl) -> Asm.data (Platform.mangle lbl) (compile_gdecl gdecl) in
+  let f = fun (name, fdecl) -> compile_fdecl tdecls name fdecl in
+  let prog = (List.map g gdecls) @ (List.map f fdecls |> List.flatten) in
   print_endline (X86.string_of_prog prog);
   prog
