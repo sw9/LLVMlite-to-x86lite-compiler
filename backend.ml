@@ -112,7 +112,6 @@ let compile_call ctxt uid (_, y, z) =
     compile_operand ctxt (g i) op in
 
   let call = begin match y with
-    | Gid g -> (compile_operand_list ctxt (Reg R10) y) @  [(Callq, [(Ind2 R10)])]
     | _ ->  (compile_operand_list ctxt (Reg R10) y) @  [(Callq, [Reg R10])]
   end in
 
@@ -120,11 +119,11 @@ let compile_call ctxt uid (_, y, z) =
 
   if s_slots > 0 then
     save_regs @ [(Addq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
-             (X86.Reg Rsp)])] @ (List.mapi f z) @ call @ retval @ 
+             (X86.Reg Rsp)])] @ (List.mapi f z) @ call @ 
     [(Subq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
-             (X86.Reg Rsp)])] @ revert_regs
+             (X86.Reg Rsp)])] @ revert_regs  @ retval
   else 
-    save_regs @ (List.mapi f z) @ call @ retval @ revert_regs
+    save_regs @ (List.mapi f z) @ call  @ revert_regs @ retval
 
 (* You will probably find it helpful to implement a helper function that   *)
 (* generates code for the LLVM IR call instruction. The code you generate  *)
