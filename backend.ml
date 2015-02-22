@@ -323,7 +323,16 @@ let compile_fdecl tdecls name { fty; param; cfg } =
       | (x, y) -> x
     end in
 
-  let lyt = begin match (generate_layout (0, []) param) with
+  let blkl =
+    begin match cfg with
+      | (x, y) -> y
+    end in
+
+  let get_uid = fun ((x, y) : uid * insn) -> x in
+  let get_uid_block = fun ((_, y): _ * block) -> List.map get_uid y.insns in
+  
+  let uids = param @  (get_uid_block ("CIS 341 sucks", blk1)) @ List.flatten  (List.map get_uid_block blkl) in
+  let lyt = begin match (generate_layout (0, []) uids) with
     | (x, y) -> y
   end in
 
