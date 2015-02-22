@@ -238,10 +238,18 @@ let compile_insn ctxt (uid, i) : X86.ins list =
             | _ -> []
             end
             
-    | Load (ty, op) -> 
-            (compile_operand_list ctxt (Reg R12) op) @
-            [(Movq, [Ind2 R12; (Reg R13)])] @
-            [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+    | Load (ty, op) ->
+           begin match op with
+           | Gid g ->
+                   (compile_operand_list ctxt (Reg R12) op) @
+                   [(Movq, [Reg R12; (Reg R13)])] @
+                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+           | _  -> 
+                   (compile_operand_list ctxt (Reg R12) op) @
+                   [(Movq, [Ind2 R12; (Reg R13)])] @
+                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+          end
+
             
     | Store (ty, op1, op2) -> 
             (compile_operand_list ctxt (Reg R12) op1) @
