@@ -78,7 +78,7 @@ let compile_operand ctxt dest : Ll.operand -> ins =
       | Null -> (Movq, [Imm (Lit 0L); dest ])
       | Const n -> (Movq, [Imm (Lit n); dest ])
       | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
-      | Gid g -> (Movq, [Ind1(Lbl (Platform.mangle g)); dest ])
+      | Gid g -> (Movq, [Ind1(Lbl g); dest ])
 
     end
 
@@ -237,7 +237,9 @@ let compile_insn ctxt (uid, i) : X86.ins list =
             end
             
     | Load (ty, op) -> 
-            (compile_operand_list ctxt (lookup ctxt.layout uid) op)
+            (compile_operand_list ctxt (Reg R12) op) @
+            [(Movq, [Ind2 R12; (Reg R13)])] @
+            [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
             
     | Store (ty, op1, op2) -> 
             (compile_operand_list ctxt (Reg R12) op1) @
