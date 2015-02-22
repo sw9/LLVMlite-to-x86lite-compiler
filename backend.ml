@@ -249,7 +249,6 @@ let compile_insn ctxt (uid, i) : X86.ins list =
                    [(Movq, [Ind2 R12; (Reg R13)])] @
                    [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
           end
-
             
     | Store (ty, op1, op2) -> 
             (compile_operand_list ctxt (Reg R12) op1) @
@@ -258,6 +257,10 @@ let compile_insn ctxt (uid, i) : X86.ins list =
     | Call (ty, op, tyopl) ->
       let f = fun (ty, op) -> 
 
+    | Bitcast (t1, o, t2) ->
+            (compile_operand_list ctxt (Reg R12) o) @
+            [(Movq, [(Reg R12); (lookup ctxt.layout uid)])] 
+    
     | _ -> []
    end
 
