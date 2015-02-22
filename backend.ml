@@ -78,13 +78,11 @@ let compile_operand ctxt dest : Ll.operand -> ins =
       | Null -> (Movq, [Imm (Lit 0L); dest ])
       | Const n -> (Movq, [Imm (Lit n); dest ])
       | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
-      | Gid g ->(print_endline (string_of_reg (R10))); (Movq, [Reg R10; dest])
+      | Gid g -> (Leaq, [(Ind3((Lbl (Platform.mangle g)), (Rip))); dest])
     end
 
 let compile_operand_list ctxt dest ll_op: ins list =
   begin match ll_op with
-    | Gid g -> (Leaq, [(Ind3((Lbl (Platform.mangle g)), (Rip))); (Reg R10)]):: 
-               (compile_operand ctxt dest ll_op) ::[]
     | _ -> (compile_operand ctxt dest ll_op)::[]
   end
 
