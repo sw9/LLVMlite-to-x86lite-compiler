@@ -78,18 +78,53 @@ let compile_operand ctxt dest : Ll.operand -> ins =
       | Null -> (Movq, [Imm (Lit 0L); dest ])
       | Const n -> (Movq, [Imm (Lit n); dest ])
       | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
-      | Gid g -> (Movq, [Ind2( R10); dest])
+      | Gid g -> (Leaq, [(Ind3((Lbl (Platform.mangle g)), (Rip))); (dest)])
+        (*(Movq, [Ind2( R10); dest])*)
     end
 
 let compile_operand_list ctxt dest ll_op: ins list =
   begin match ll_op with
-    | Gid g -> (Leaq, [(Ind3((Lbl (Platform.mangle g)), (Rip))); (Reg R10)]):: 
-        [(compile_operand ctxt dest ll_op)]
+    (*| Gid g -> (Leaq, [(Ind3((Lbl (Platform.mangle g)), (Rip))); (Reg R10)]):: 
+        [(compile_operand ctxt dest ll_op)])*)
     | _ -> (compile_operand ctxt dest ll_op)::[]
   end
 
 (* compiling call                                                          *)
 (* ----------------------------------------------------------              *)
+
+
+let compile_call ctxt uid (_, y, z) =
+  let s_slots = (List.length z - 6) in
+ 
+  let save_regs =  (Pushq, [X86.Reg R11])::[] in
+  let revert_regs =  (Popq, [X86.Reg R11])::[] in
+
+  let f = fun i (t, op) -> 
+    let g = fun n ->  begin match n with
+        | 0 -> X86.Reg Rdi
+        | 1 -> X86.Reg Rsi
+        | 2 -> X86.Reg Rdx
+        | 3 -> X86.Reg Rcx
+        | 4 -> X86.Reg R08
+        | 5 -> X86.Reg R09
+        | _ -> (X86.Ind3 (Lit (Int64.neg (Int64.of_int ((n - 6)*8))), Rsp))
+      end in
+    compile_operand ctxt (g i) op in
+
+  let call = begin match y with
+    | Gid g -> (compile_operand_list ctxt (Reg R10) y) @  [(Callq, [(Ind2 R10)])]
+    | _ ->  (compile_operand_list ctxt (Reg R10) y) @  [(Callq, [Reg R10])]
+  end in
+
+  let retval = [(Movq, [Reg Rax; (lookup ctxt.layout uid)])] in
+
+  if s_slots > 0 then
+    save_regs @ [(Addq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
+             (X86.Reg Rsp)])] @ (List.mapi f z) @ call @ retval @ 
+    [(Subq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
+             (X86.Reg Rsp)])] @ revert_regs
+  else 
+    save_regs @ (List.mapi f z) @ call @ retval @ revert_regs
 
 (* You will probably find it helpful to implement a helper function that   *)
 (* generates code for the LLVM IR call instruction. The code you generate  *)
@@ -240,10 +275,10 @@ let compile_insn ctxt (uid, i) : X86.ins list =
             
     | Load (ty, op) ->
            begin match op with
-           | Gid g ->
+           (*| Gid g ->
                    (compile_operand_list ctxt (Reg R12) op) @
                    [(Movq, [Reg R12; (Reg R13)])] @
-                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])]*) 
            | _  -> 
                    (compile_operand_list ctxt (Reg R12) op) @
                    [(Movq, [Ind2 R12; (Reg R13)])] @
@@ -258,7 +293,8 @@ let compile_insn ctxt (uid, i) : X86.ins list =
     | Bitcast (t1, o, t2) ->
             (compile_operand_list ctxt (Reg R12) o) @
             [(Movq, [(Reg R12); (lookup ctxt.layout uid)])] 
-    
+    | Call (ty, operand, lst) -> 
+      compile_call ctxt uid (ty, operand, lst)
     | _ -> []
     end
 
