@@ -228,6 +228,23 @@ let compile_insn ctxt (uid, i) : X86.ins list =
             [(Cmpq, [Reg R12; Reg R13])] @ 
             [(Set (compile_cnd c) , [(lookup ctxt.layout uid)])] 
 
+    
+    | Alloca ty ->  
+            begin match ty with
+            | I1 | Ptr _ | I64 -> 
+                    [(Movq, [Reg Rsp; (lookup ctxt.layout uid)])] @
+                    [(Subq, [(Imm (Lit (8L))); (X86.Reg Rsp)])] 
+            | _ -> []
+            end
+            
+    | Load (ty, op) -> 
+            (compile_operand_list ctxt (lookup ctxt.layout uid) op)
+            
+    | Store (ty, op1, op2) -> 
+            (compile_operand_list ctxt (Reg R12) op1) @
+            (compile_operand_list ctxt (Reg R13) op2) @
+            [(Movq, [(Reg R12); (Ind2 R13)])]
+
     | _ -> []
    end
 
