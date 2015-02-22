@@ -77,7 +77,7 @@ let compile_operand ctxt dest : Ll.operand -> ins =
   fun (x: Ll.operand) -> begin match x with
       | Null -> (Movq, [Imm (Lit 0L); dest ])
       | Const n -> (Movq, [Imm (Lit n); dest ])
-      | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
+      | Id i -> print_endline i; (Movq, [ List.assoc i ctxt.layout; dest])
       | Gid g -> (Movq, [(Reg R10); dest ])
     end
 
@@ -85,7 +85,7 @@ let compile_operand_list ctxt dest ll_op: ins list =
   begin match ll_op with
     | Gid g -> (Leaq, [(Imm (Lbl (Platform.mangle g))); 
                        (Reg R10)])::(compile_operand ctxt dest ll_op)::[]
-    | _ -> (compile_operand ctxt dest ll_op)::[]
+    | _ -> print_endline "col";  (compile_operand ctxt dest ll_op)::[]
   end
 
 (* compiling call                                                          *)
@@ -170,10 +170,11 @@ let compile_gep ctxt (op : Ll.ty * Ll.operand) (path: Ll.operand list) : ins lis
 (* stack - Bitcast: does nothing interesting at the assembly level         *)
 
 let compile_insn ctxt (uid, i) : X86.ins list =
+
    begin match i with
    | Binop(b, t, op1, op2) -> 
           begin match b with
-          | Add -> 
+          | Add ->
                   (compile_operand_list ctxt (Reg R12) op1) @
                   (compile_operand_list ctxt (Reg R13) op2) @
                   [(Addq, [Reg R12; Reg R13])] @ 
@@ -232,9 +233,10 @@ let compile_insn ctxt (uid, i) : X86.ins list =
 (* and putting the return value (if any) in %rax. - Br should jump - Cbr   *)
 (* branch should treat its operand as a boolean conditional                *)
 let compile_terminator ctxt t =
-  print_endline (string_of_terminator t);
+  
   begin match t with
     | Ret (ty, o) ->
+
       let ins = [(Movq, [(Ind3(Lit(Int64.neg 8L), Rbp)); (Reg Rbx)])] @
 		[(Movq, [(Ind3(Lit(Int64.neg 16L), Rbp)); (Reg R12)])] @
 		[(Movq, [(Ind3(Lit(Int64.neg 24L), Rbp)); (Reg R13)])] @
@@ -248,7 +250,8 @@ let compile_terminator ctxt t =
 	| Some op ->
 	  begin match ty with
 	    | Void -> ins  (* void*)
-	    | _ -> (compile_operand_list ctxt (X86.Reg R11) op) @ ins
+	    | _ -> print_endline "term";
+              (compile_operand_list ctxt (X86.Reg Rax) op) @ ins
 	  end
       end
      | Br lbl -> [(Jmp, [(Imm (Lbl (Platform.mangle lbl)))])]
@@ -268,7 +271,10 @@ let compile_terminator ctxt t =
 
 (* We have left this helper function here for you to complete. *)
 let compile_block ctxt blk : ins list =
-  
+  let f = fun (x: uid * insn) -> compile_insn ctxt x in
+  let insns = List.map f blk.insns |> List.flatten in
+  let term = compile_terminator ctxt blk.terminator in
+  insns @ term
 
 let compile_lbl_block lbl ctxt blk : elem =
   Asm.text lbl (compile_block ctxt blk)
@@ -310,30 +316,42 @@ let compile_fdecl tdecls name { fty; param; cfg } =
       | (x, y) -> x
     end in
 
-  let f = fun (i: int) (x: ty) ->
-    let op = arg_loc i in
-    (Pushq, [op])
-  in
-  let (x, y) = fty in
+  let lyt = begin match (generate_layout (0, []) param) with
+    | (x, y) -> y
+  end in
 
-  let args = (List.mapi f x) in
-  let isnl2 = (Pushq, [X86.Reg Rbp]):: (Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::
+  let ctxt = {tdecls = tdecls; layout = lyt} in
+  
+  let f = fun (i: int) (x: uid) ->
+    let op = arg_loc i in
+    (Movq, [op; List.assoc x lyt])
+  in
+  
+  let args = List.mapi f param in
+  
+  let enter = (Pushq, [X86.Reg Rbp]):: (Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::
 	      (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
 	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15]):: (Pushq, [X86.Reg R15])::
               (Pushq, [X86.Reg R15]):: (Movq, [(X86.Reg Rsp); (X86.Reg R11)]) ::
               (Addq, [(X86.Imm (Lit (Int64.of_int (8 * (List.length param - 1))))); (X86.Reg Rsp)]) ::
 	      [] in
-
-  let lyt = begin match (generate_layout (0, []) param) with
-    | (x, y) -> y
-  end in
-
-  let insl = isnl2 @ args 
-             
-             @ (compile_terminator {tdecls = tdecls; layout = lyt} blk1.terminator) in
+  
+  let insl = enter @ args @ (compile_block ctxt  blk1) @ (compile_terminator ctxt  blk1.terminator)  in
+  print_endline "fdecl";
+  
   let elem = [{ lbl = Platform.mangle name; global = true; asm = X86.Text insl }] in
 
+  let blk_list =
+    begin match cfg with
+      | (x, y) -> y
+    end
+  in
+
+  let g = fun ((x, y) : lbl * block)->
+    compile_lbl_block x ctxt y
+  in
   
+  elem @ List.map g blk_list
 
 (* compile_gdecl                                                           *)
 (* ------------------------------------------------------------            *)
