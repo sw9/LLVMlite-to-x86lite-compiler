@@ -79,6 +79,7 @@ let compile_operand ctxt dest : Ll.operand -> ins =
       | Const n -> (Movq, [Imm (Lit n); dest ])
       | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
       | Gid g -> (Movq, [Ind1(Lbl (Platform.mangle g)); dest ])
+
     end
 
 let compile_operand_list ctxt dest ll_op: ins list =
@@ -188,19 +189,19 @@ let compile_insn ctxt (uid, i) : X86.ins list =
                   [(Imulq, [Reg R12; Reg R13])] @ 
                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
           | Shl -> 
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Shlq, [Reg R12; Reg R13])] @ 
+                  (compile_operand_list ctxt (Reg R13) op1) @
+                  (compile_operand_list ctxt (Reg Rcx) op2) @
+                  [(Shlq, [Reg Rcx; Reg R13])] @ 
                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
           | Lshr -> 
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Shrq, [Reg R12; Reg R13])] @ 
+                  (compile_operand_list ctxt (Reg R13) op1) @
+                  (compile_operand_list ctxt (Reg Rcx) op2) @
+                  [(Shrq, [Reg Rcx; Reg R13])] @ 
                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
           | Ashr -> 
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Sarq, [Reg R12; Reg R13])] @ 
+                  (compile_operand_list ctxt (Reg R13) op1) @
+                  (compile_operand_list ctxt (Reg Rcx) op2) @
+                  [(Sarq, [Reg Rcx; Reg R13])] @ 
                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
           | And -> 
                   (compile_operand_list ctxt (Reg R12) op1) @
@@ -255,8 +256,7 @@ let compile_terminator ctxt t =
 	| Some op ->
 	  begin match ty with
 	    | Void -> ins  (* void*)
-	    | _ -> 
-              (compile_operand_list ctxt (X86.Reg Rax) op) @ ins
+	    | _ -> (compile_operand_list ctxt (X86.Reg Rax) op) @ ins
 	  end
       end
      | Br lbl -> [(Jmp, [(Imm (Lbl (Platform.mangle lbl)))])]
@@ -341,7 +341,7 @@ let compile_fdecl tdecls name { fty; param; cfg } =
       print_endline (string_of_operand y)
   in
 
-  List.iter print_tup lyt;
+  (* List.iter print_tup lyt; *)
 
   let ctxt = {tdecls = tdecls; layout = lyt} in
   
@@ -359,7 +359,6 @@ let compile_fdecl tdecls name { fty; param; cfg } =
 	      [] in
   
   let insl = enter @ args @ (compile_block ctxt  blk1) @ (compile_terminator ctxt  blk1.terminator)  in
-    
   let elem = [{ lbl = Platform.mangle name; global = true; asm = X86.Text insl }] in
 
   let blk_list =
