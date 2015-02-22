@@ -77,7 +77,7 @@ let compile_operand ctxt dest : Ll.operand -> ins =
   fun (x: Ll.operand) -> begin match x with
       | Null -> (Movq, [Imm (Lit 0L); dest ])
       | Const n -> (Movq, [Imm (Lit n); dest ])
-      | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
+      | Id i -> (Movq, [Reg R10; dest])
       | Gid g -> (Leaq, [(Ind3((Lbl (Platform.mangle g)), (Rip))); (dest)])
         (*(Movq, [Ind2( R10); dest])*)
     end
@@ -86,12 +86,12 @@ let compile_operand_list ctxt dest ll_op: ins list =
   begin match ll_op with
     (*| Gid g -> (Leaq, [(Ind3((Lbl (Platform.mangle g)), (Rip))); (Reg R10)]):: 
         [(compile_operand ctxt dest ll_op)])*)
+    | Id i -> (Movq, [List.assoc i ctxt.layout; (Reg R10)])::(compile_operand ctxt dest ll_op)::[]
     | _ -> (compile_operand ctxt dest ll_op)::[]
   end
 
 (* compiling call                                                          *)
 (* ----------------------------------------------------------              *)
-
 
 let compile_call ctxt uid (_, y, z) =
   let s_slots = (List.length z - 6) in
@@ -107,9 +107,11 @@ let compile_call ctxt uid (_, y, z) =
         | 3 -> X86.Reg Rcx
         | 4 -> X86.Reg R08
         | 5 -> X86.Reg R09
-        | _ -> (X86.Ind3 (Lit (Int64.neg (Int64.of_int ((n - 6)*8))), Rsp))
+        | _ -> (X86.Ind3 (Lit (Int64.of_int ((n - 6)*8)), Rsp))
       end in
-    compile_operand ctxt (g i) op in
+    compile_operand_list ctxt (g i) op in
+
+  let args = (List.mapi f z |> List.flatten) in
 
   let call = begin match y with
     | _ ->  (compile_operand_list ctxt (Reg R10) y) @  [(Callq, [Reg R10])]
@@ -118,12 +120,11 @@ let compile_call ctxt uid (_, y, z) =
   let retval = [(Movq, [Reg Rax; (lookup ctxt.layout uid)])] in
 
   if s_slots > 0 then
-    save_regs @ [(Addq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
-             (X86.Reg Rsp)])] @ (List.mapi f z) @ call @ 
-    [(Subq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
+    save_regs @ [(Subq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
+             (X86.Reg Rsp)])] @ args @ call @ [(Addq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
              (X86.Reg Rsp)])] @ revert_regs  @ retval
   else 
-    save_regs @ (List.mapi f z) @ call  @ revert_regs @ retval
+    save_regs @ args @ call  @ revert_regs @ retval
 
 (* You will probably find it helpful to implement a helper function that   *)
 (* generates code for the LLVM IR call instruction. The code you generate  *)
@@ -205,97 +206,97 @@ let compile_gep ctxt (op : Ll.ty * Ll.operand) (path: Ll.operand list) : ins lis
 
 let compile_insn ctxt (uid, i) : X86.ins list =
 
-   begin match i with
-   | Binop(b, t, op1, op2) -> 
-          begin match b with
-          | Add ->
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Addq, [Reg R12; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
-          | Sub -> 
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Subq, [Reg R13; Reg R12])] @ 
-                  [(Movq, [(Reg R12); (lookup ctxt.layout uid)])] 
-          | Mul -> 
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Imulq, [Reg R12; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
-          | Shl -> 
-                  (compile_operand_list ctxt (Reg R13) op1) @
-                  (compile_operand_list ctxt (Reg Rcx) op2) @
-                  [(Shlq, [Reg Rcx; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
-          | Lshr -> 
-                  (compile_operand_list ctxt (Reg R13) op1) @
-                  (compile_operand_list ctxt (Reg Rcx) op2) @
-                  [(Shrq, [Reg Rcx; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
-          | Ashr -> 
-                  (compile_operand_list ctxt (Reg R13) op1) @
-                  (compile_operand_list ctxt (Reg Rcx) op2) @
-                  [(Sarq, [Reg Rcx; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
-          | And -> 
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Andq, [Reg R12; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
-          | Or -> 
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Orq, [Reg R12; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+  begin match i with
+    | Binop(b, t, op1, op2) -> 
+      begin match b with
+        | Add ->
+          (compile_operand_list ctxt (Reg R12) op1) @
+          (compile_operand_list ctxt (Reg R13) op2) @
+          [(Addq, [Reg R12; Reg R13])] @ 
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+        | Sub -> 
+          (compile_operand_list ctxt (Reg R12) op1) @
+          (compile_operand_list ctxt (Reg R13) op2) @
+          [(Subq, [Reg R13; Reg R12])] @ 
+          [(Movq, [(Reg R12); (lookup ctxt.layout uid)])] 
+        | Mul -> 
+          (compile_operand_list ctxt (Reg R12) op1) @
+          (compile_operand_list ctxt (Reg R13) op2) @
+          [(Imulq, [Reg R12; Reg R13])] @ 
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+        | Shl -> 
+          (compile_operand_list ctxt (Reg R13) op1) @
+          (compile_operand_list ctxt (Reg Rcx) op2) @
+          [(Shlq, [Reg Rcx; Reg R13])] @ 
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+        | Lshr -> 
+          (compile_operand_list ctxt (Reg R13) op1) @
+          (compile_operand_list ctxt (Reg Rcx) op2) @
+          [(Shrq, [Reg Rcx; Reg R13])] @ 
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+        | Ashr -> 
+          (compile_operand_list ctxt (Reg R13) op1) @
+          (compile_operand_list ctxt (Reg Rcx) op2) @
+          [(Sarq, [Reg Rcx; Reg R13])] @ 
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+        | And -> 
+          (compile_operand_list ctxt (Reg R12) op1) @
+          (compile_operand_list ctxt (Reg R13) op2) @
+          [(Andq, [Reg R12; Reg R13])] @ 
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+        | Or -> 
+          (compile_operand_list ctxt (Reg R12) op1) @
+          (compile_operand_list ctxt (Reg R13) op2) @
+          [(Orq, [Reg R12; Reg R13])] @ 
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
 
-          | Xor -> 
-                  (compile_operand_list ctxt (Reg R12) op1) @
-                  (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Xorq, [Reg R12; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
-          end
+        | Xor -> 
+          (compile_operand_list ctxt (Reg R12) op1) @
+          (compile_operand_list ctxt (Reg R13) op2) @
+          [(Xorq, [Reg R12; Reg R13])] @ 
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+      end
 
     | Icmp (c,t,op1,op2) ->
-            (compile_operand_list ctxt (Reg R12) op1) @
-            (compile_operand_list ctxt (Reg R13) op2) @
-            [(Movq, [(Imm (Lit 0L)); (lookup ctxt.layout uid)])] @
-            [(Cmpq, [Reg R13; Reg R12])] @ 
-            [(Set (compile_cnd c) , [(lookup ctxt.layout uid)])] 
+      (compile_operand_list ctxt (Reg R12) op1) @
+      (compile_operand_list ctxt (Reg R13) op2) @
+      [(Movq, [(Imm (Lit 0L)); (lookup ctxt.layout uid)])] @
+      [(Cmpq, [Reg R13; Reg R12])] @ 
+      [(Set (compile_cnd c) , [(lookup ctxt.layout uid)])] 
 
-    
+
     | Alloca ty ->  
-            begin match ty with
-            | I1 | Ptr _ | I64 -> 
-                    [(Movq, [Reg Rsp; (lookup ctxt.layout uid)])] @
-                    [(Subq, [(Imm (Lit (8L))); (X86.Reg Rsp)])] 
-            | _ -> []
-            end
-            
+      begin match ty with
+        | I1 | Ptr _ | I64 -> 
+          [(Subq, [(Imm (Lit (8L))); (X86.Reg Rsp)])] @
+          [(Movq, [Reg Rsp; (lookup ctxt.layout uid)])] 
+        | _ -> []
+      end
+
     | Load (ty, op) ->
-           begin match op with
-           (*| Gid g ->
-                   (compile_operand_list ctxt (Reg R12) op) @
-                   [(Movq, [Reg R12; (Reg R13)])] @
-                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])]*) 
-           | _  -> 
-                   (compile_operand_list ctxt (Reg R12) op) @
-                   [(Movq, [Ind2 R12; (Reg R13)])] @
-                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
-          end
-            
+      begin match op with
+        (*| Gid g ->
+                (compile_operand_list ctxt (Reg R12) op) @
+                [(Movq, [Reg R12; (Reg R13)])] @
+                [(Movq, [(Reg R13); (lookup ctxt.layout uid)])]*) 
+        | _  -> 
+          (compile_operand_list ctxt (Reg R12) op) @
+          [(Movq, [Ind2 R12; (Reg R13)])] @
+          [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+      end
+
     | Store (ty, op1, op2) -> 
-            (compile_operand_list ctxt (Reg R12) op1) @
-            (compile_operand_list ctxt (Reg R13) op2) @
-            [(Movq, [(Reg R12); (Ind2 R13)])]
+      (compile_operand_list ctxt (Reg R12) op1) @
+      (compile_operand_list ctxt (Reg R13) op2) @
+      [(Movq, [(Reg R12); (Ind2 R13)])]
 
     | Bitcast (t1, o, t2) ->
-            (compile_operand_list ctxt (Reg R12) o) @
-            [(Movq, [(Reg R12); (lookup ctxt.layout uid)])] 
+      (compile_operand_list ctxt (Reg R12) o) @
+      [(Movq, [(Reg R12); (lookup ctxt.layout uid)])] 
     | Call (ty, operand, lst) -> 
       compile_call ctxt uid (ty, operand, lst)
     | _ -> []
-    end
+  end
 
 
     (* compiling terminators                                                   *)
@@ -367,7 +368,7 @@ let arg_loc (n : int) : operand =
     | 3 -> X86.Reg Rcx
     | 4 -> X86.Reg R08
     | 5 -> X86.Reg R09
-    | _ -> (X86.Ind3 (Lit (Int64.of_int ((n -4) *8)), Rbp))
+    | _ -> (X86.Ind3 (Lit (Int64.of_int ((n-4) *8)), Rbp))
   end
 
 (* The code for the entry-point of a function must do several things: -    *)
@@ -396,11 +397,10 @@ let compile_fdecl tdecls name { fty; param; cfg } =
   let get_uid = fun ((x, y) : uid * insn) -> x in
   let get_uid_block = fun ((_, y): _ * block) -> List.map get_uid y.insns in
   
-  let uids = param @  (get_uid_block ("CIS 341 sucks", blk1)) @ List.flatten  (List.map get_uid_block blkl) in
+  let uids = List.sort_uniq String.compare (param @ (get_uid_block ("CIS 341 sucks", blk1)) @ List.flatten  (List.map get_uid_block blkl)) in
   let lyt = begin match (generate_layout (0, []) uids) with
     | (x, y) -> y
   end in
-
 
   let print_tup (x,y) = 
       print_string x ;
@@ -414,19 +414,18 @@ let compile_fdecl tdecls name { fty; param; cfg } =
   
   let f = fun (i: int) (x: uid) ->
     let op = arg_loc i in
-    (Movq, [op; List.assoc x lyt])
+    (Movq, [op; Reg R10])::(Movq, [Reg R10; List.assoc x lyt])::[]
   in
   
-  let args = List.mapi f param in
-  
+  let args = List.flatten (List.mapi f param) in
   let enter = (Pushq, [X86.Reg Rbp]):: (Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::
 	      (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
 	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15]):: (Pushq, [X86.Reg R15]):: (Movq, [(X86.Reg Rsp); (X86.Reg R11)]) ::
-              (Addq, [(X86.Imm (Lit (Int64.of_int (8 * (List.length param - 1))))); (X86.Reg Rsp)]) ::
+              (Subq, [(X86.Imm (Lit (Int64.of_int (8 * (List.length uids - 1))))); (X86.Reg Rsp)]) ::
 	      [] in
   
   let insl = enter @ args @ (compile_block ctxt  blk1) @ (compile_terminator ctxt  blk1.terminator)  in
-  let elem = [{ lbl = Platform.mangle name; global = true; asm = X86.Text insl }] in
+  let elem = Asm.gtext (Platform.mangle  name) insl in
 
   let blk_list =
     begin match cfg with
@@ -438,7 +437,7 @@ let compile_fdecl tdecls name { fty; param; cfg } =
     compile_lbl_block x ctxt y
   in
   
-  elem @ List.map g blk_list
+  [elem] @ List.map g blk_list
 
 (* compile_gdecl                                                           *)
 (* ------------------------------------------------------------            *)
