@@ -151,7 +151,19 @@ let rec size_ty tdecls t : int =
 (* but relative to the type f the sub-element picked out by the path so    *)
 (* far                                                                     *)
 let compile_gep ctxt (op : Ll.ty * Ll.operand) (path: Ll.operand list) : ins list =
-  failwith "compile_gep not implemented"
+    begin match op with
+    | (Ptr p, o) -> 
+            
+            let get_addr = (compile_operand_list ctxt (Reg R12) o) in
+            let x = begin match path with | (x::_) -> x | _ -> raise (Failure
+            "arg")  end in
+            let add_reg = (compile_operand_list ctxt (Reg R13) x) @ [Imulq ,
+            [Imm(Lit (Int64.of_int  (size_ty ctxt.tdecls p)));(Reg R13)]] in
+            let inc_reg = [Addq, [(Reg R13);(Reg R12)]] in 
+            get_addr @ add_reg @ inc_reg
+
+    | (_ , _) -> []
+    end
 
 (* compiling instructions                                                  *)
 (* --------------------------------------------------                      *)
@@ -259,6 +271,7 @@ let compile_insn ctxt (uid, i) : X86.ins list =
             (compile_operand_list ctxt (Reg R12) o) @
             [(Movq, [(Reg R12); (lookup ctxt.layout uid)])] 
     
+    | Gep (t, o, ol) -> (compile_gep ctxt (t,o) ol)
     | _ -> []
     end
 
