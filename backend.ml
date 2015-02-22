@@ -182,8 +182,8 @@ let compile_insn ctxt (uid, i) : X86.ins list =
           | Sub -> 
                   (compile_operand_list ctxt (Reg R12) op1) @
                   (compile_operand_list ctxt (Reg R13) op2) @
-                  [(Subq, [Reg R12; Reg R13])] @ 
-                  [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
+                  [(Subq, [Reg R13; Reg R12])] @ 
+                  [(Movq, [(Reg R12); (lookup ctxt.layout uid)])] 
           | Mul -> 
                   (compile_operand_list ctxt (Reg R12) op1) @
                   (compile_operand_list ctxt (Reg R13) op2) @
@@ -266,7 +266,7 @@ let compile_terminator ctxt t =
        begin match op with
          | Const _ | Gid _ | Id _
            -> (compile_operand_list ctxt (X86.Reg R10) op) @ 
-               [(Cmpq, [(Reg R10); (Imm (Lit (1L)))])] @
+               [(Cmpq, [(Imm (Lit (1L))); (Reg R10)])] @
                [(J Eq, [(Imm (Lbl (Platform.mangle l1)))])] @
                [(Jmp, [(Imm (Lbl (Platform.mangle l2)))])]
          | _ -> failwith "not a valid condition"
@@ -284,7 +284,7 @@ let compile_block ctxt blk : ins list =
   insns @ term
 
 let compile_lbl_block lbl ctxt blk : elem =
-  Asm.text lbl (compile_block ctxt blk)
+  Asm.text (Platform.mangle  lbl) (compile_block ctxt blk)
 
 (* compile_fdecl                                                           *)
 (* ------------------------------------------------------------            *)
