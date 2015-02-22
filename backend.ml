@@ -77,15 +77,13 @@ let compile_operand ctxt dest : Ll.operand -> ins =
   fun (x: Ll.operand) -> begin match x with
       | Null -> (Movq, [Imm (Lit 0L); dest ])
       | Const n -> (Movq, [Imm (Lit n); dest ])
-      | Id i -> print_endline i; (Movq, [ List.assoc i ctxt.layout; dest])
-      | Gid g -> (Movq, [(Reg R10); dest ])
+      | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
+      | Gid g -> (Movq, [Ind1(Lbl (Platform.mangle g)); dest ])
     end
 
 let compile_operand_list ctxt dest ll_op: ins list =
   begin match ll_op with
-    | Gid g -> (Leaq, [(Imm (Lbl (Platform.mangle g))); 
-                       (Reg R10)])::(compile_operand ctxt dest ll_op)::[]
-    | _ -> print_endline "col";  (compile_operand ctxt dest ll_op)::[]
+    | _ -> (compile_operand ctxt dest ll_op)::[]
   end
 
 (* compiling call                                                          *)
@@ -225,7 +223,7 @@ let compile_insn ctxt (uid, i) : X86.ins list =
     | Icmp (c,t,op1,op2) ->
             (compile_operand_list ctxt (Reg R12) op1) @
             (compile_operand_list ctxt (Reg R13) op2) @
-            [(Cmpq, [Reg R12; Reg R13])] @ 
+            [(Cmpq, [Reg R13; Reg R12])] @ 
             [(Set (compile_cnd c) , [(lookup ctxt.layout uid)])] 
 
     | _ -> []
@@ -257,7 +255,7 @@ let compile_terminator ctxt t =
 	| Some op ->
 	  begin match ty with
 	    | Void -> ins  (* void*)
-	    | _ -> print_endline "term";
+	    | _ -> 
               (compile_operand_list ctxt (X86.Reg Rax) op) @ ins
 	  end
       end
@@ -356,14 +354,12 @@ let compile_fdecl tdecls name { fty; param; cfg } =
   
   let enter = (Pushq, [X86.Reg Rbp]):: (Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::
 	      (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
-	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15]):: (Pushq, [X86.Reg R15])::
-              (Pushq, [X86.Reg R15]):: (Movq, [(X86.Reg Rsp); (X86.Reg R11)]) ::
+	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15]):: (Pushq, [X86.Reg R15]):: (Movq, [(X86.Reg Rsp); (X86.Reg R11)]) ::
               (Addq, [(X86.Imm (Lit (Int64.of_int (8 * (List.length param - 1))))); (X86.Reg Rsp)]) ::
 	      [] in
   
   let insl = enter @ args @ (compile_block ctxt  blk1) @ (compile_terminator ctxt  blk1.terminator)  in
-  print_endline "fdecl";
-  
+    
   let elem = [{ lbl = Platform.mangle name; global = true; asm = X86.Text insl }] in
 
   let blk_list =
