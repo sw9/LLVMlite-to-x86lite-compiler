@@ -78,7 +78,7 @@ let compile_operand ctxt dest : Ll.operand -> ins =
       | Null -> (Movq, [Imm (Lit 0L); dest ])
       | Const n -> (Movq, [Imm (Lit n); dest ])
       | Id i -> (Movq, [ List.assoc i ctxt.layout; dest])
-      | Gid g -> (Movq, [Ind2(R10); dest])
+      | Gid g ->(print_endline (string_of_reg (R10))); (Movq, [Reg R10; dest])
     end
 
 let compile_operand_list ctxt dest ll_op: ins list =
