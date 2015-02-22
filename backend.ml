@@ -220,8 +220,15 @@ let compile_insn ctxt (uid, i) : X86.ins list =
                   [(Xorq, [Reg R12; Reg R13])] @ 
                   [(Movq, [(Reg R13); (lookup ctxt.layout uid)])] 
           end
+
+    | Icmp (c,t,op1,op2) ->
+            (compile_operand_list ctxt (Reg R12) op1) @
+            (compile_operand_list ctxt (Reg R13) op2) @
+            [(Cmpq, [Reg R12; Reg R13])] @ 
+            [(Set (compile_cnd c) , [(lookup ctxt.layout uid)])] 
+
     | _ -> []
-          end
+   end
 
 
     (* compiling terminators                                                   *)
