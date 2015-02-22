@@ -256,7 +256,7 @@ let compile_insn ctxt (uid, i) : X86.ins list =
             (compile_operand_list ctxt (Reg R13) op2) @
             [(Movq, [(Reg R12); (Ind2 R13)])]
     | Call (ty, op, tyopl) ->
-      
+      let f = fun (ty, op) -> 
 
     | _ -> []
    end
