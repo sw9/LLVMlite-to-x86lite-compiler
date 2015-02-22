@@ -327,6 +327,15 @@ let compile_fdecl tdecls name { fty; param; cfg } =
     | (x, y) -> y
   end in
 
+
+  let print_tup (x,y) = 
+      print_string x ;
+      print_string " ";
+      print_endline (string_of_operand y)
+  in
+
+  List.iter print_tup lyt;
+
   let ctxt = {tdecls = tdecls; layout = lyt} in
   
   let f = fun (i: int) (x: uid) ->
