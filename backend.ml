@@ -86,7 +86,8 @@ let compile_operand_list ctxt dest ll_op: ins list =
   begin match ll_op with
     (*| Gid g -> (Leaq, [(Ind3((Lbl (Platform.mangle g)), (Rip))); (Reg R10)]):: 
         [(compile_operand ctxt dest ll_op)])*)
-    | Id i -> (Movq, [List.assoc i ctxt.layout; (Reg R10)])::(compile_operand ctxt dest ll_op)::[]
+    | Id i -> (Movq, [List.assoc i ctxt.layout; (Reg R10)])::
+              (compile_operand ctxt dest ll_op)::[]
     | _ -> (compile_operand ctxt dest ll_op)::[]
   end
 
@@ -121,7 +122,11 @@ let compile_call ctxt uid (_, y, z) =
 
   if s_slots > 0 then
     save_regs @ [(Subq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
-             (X86.Reg Rsp)])] @ args @ call @ [(Addq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
+             (X86.Reg Rsp)])] @ 
+             args @ 
+             call @ 
+             [(Addq, [(X86.Imm (Lit (Int64.of_int (8 * (s_slots))))); 
+             
              (X86.Reg Rsp)])] @ revert_regs  @ retval
   else 
     save_regs @ args @ call  @ revert_regs @ retval
@@ -350,8 +355,6 @@ let compile_insn ctxt (uid, i) : X86.ins list =
 
     | Call (ty, operand, lst) -> 
             compile_call ctxt uid (ty, operand, lst)
-    
-    | _ -> []
   end
 
 
@@ -453,18 +456,14 @@ let compile_fdecl tdecls name { fty; param; cfg } =
   let get_uid = fun ((x, y) : uid * insn) -> x in
   let get_uid_block = fun ((_, y): _ * block) -> List.map get_uid y.insns in
   
-  let uids = List.sort String.compare (param @ (get_uid_block ("Begin", blk1)) @ List.flatten  (List.map get_uid_block blkl)) in
+  let uids = List.sort String.compare (param @ 
+  (get_uid_block ("Begin", blk1)) @ 
+  List.flatten  (List.map get_uid_block blkl)) 
+  in
+  
   let lyt = begin match (generate_layout (0, []) uids) with
     | (x, y) -> y
   end in
-
-  let print_tup (x,y) = 
-      print_string x ;
-      print_string " ";
-      print_endline (string_of_operand y)
-  in
-
-  (* List.iter print_tup lyt; *)
 
   let ctxt = {tdecls = tdecls; layout = lyt} in
   
@@ -476,11 +475,17 @@ let compile_fdecl tdecls name { fty; param; cfg } =
   let args = List.flatten (List.mapi f param) in
   let enter = (Pushq, [X86.Reg Rbp]):: (Movq, [(X86.Reg Rsp); (X86.Reg Rbp)])::
 	      (Pushq, [X86.Reg Rbx]):: (Pushq, [X86.Reg R12]):: (Pushq, [X86.Reg R13])::
-	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15]):: (Pushq, [X86.Reg R15]):: (Movq, [(X86.Reg Rsp); (X86.Reg R11)]) ::
+	      (Pushq, [X86.Reg R14]):: (Pushq, [X86.Reg R15]):: (Pushq, [X86.Reg R15]):: 
+              (Movq, [(X86.Reg Rsp); (X86.Reg R11)]) ::
               (Subq, [(X86.Imm (Lit (Int64.of_int (8 * (List.length uids - 1))))); (X86.Reg Rsp)]) ::
 	      [] in
   
-  let insl = enter @ args @ (compile_block ctxt  blk1) @ (compile_terminator ctxt  blk1.terminator)  in
+  let insl = enter @ 
+  args @ 
+  (compile_block ctxt  blk1) @ 
+  (compile_terminator ctxt  blk1.terminator)  
+  in
+  
   let elem = Asm.gtext (Platform.mangle  name) insl in
 
   let blk_list =
