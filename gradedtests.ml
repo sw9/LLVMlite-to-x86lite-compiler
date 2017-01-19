@@ -147,16 +147,6 @@ let tests : suite =
   ; GradedTest("large tests", 10, executed large_tests)
   ; GradedTest("io tests", 10, executed_io io_tests)
   ]
-
-let manual_tests : suite = [
-  GradedTest ("Posted Piazza Test Case", 5,
-    [  ]
-  );
-  GradedTest ("Other Student Piazza Tests", 5,
-    [  ]
-  );
-]
-
+  
 let graded_tests : suite = 
-  tests @
-  manual_tests
+  tests
